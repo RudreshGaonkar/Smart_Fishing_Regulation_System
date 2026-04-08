@@ -6,7 +6,7 @@ export const formatDate = (date: string | Date | null): string => {
   if (!date) return 'N/A';
   const d = new Date(date);
   return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
+    year: 'numeric', // Add explicit properties
     month: 'short',
     day: 'numeric',
   }).format(d);
@@ -25,7 +25,7 @@ export const formatStockPercentage = (percentage: number | null | undefined): st
  * Formats distance in kilometers.
  * Example: 12.45 -> '12.45 km'
  */
-export const formatDistanceKm = (distance: number | null | undefined): string => {
-  if (distance === null || distance === undefined) return 'N/A';
-  return `${Number(distance).toFixed(2)} km`;
+export const formatDistance = (distanceKm: number | null | undefined): string => {
+  if (distanceKm === null || distanceKm === undefined) return 'N/A';
+  return `${Number(distanceKm).toFixed(2)} km`;
 };

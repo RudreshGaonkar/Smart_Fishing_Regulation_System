@@ -8,16 +8,21 @@ import {
   ShieldAlert, 
   FileText 
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const Sidebar: React.FC = () => {
+  const { user } = useAuth();
+
   const navItems = [
-    { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { to: '/simulation', icon: <Ship size={20} />, label: 'Simulation' },
-    { to: '/map', icon: <MapIcon size={20} />, label: 'Zone Map' },
-    { to: '/alerts', icon: <AlertTriangle size={20} />, label: 'Alerts' },
-    { to: '/admin', icon: <ShieldAlert size={20} />, label: 'Admin Panel' },
-    { to: '/reports', icon: <FileText size={20} />, label: 'Reports' },
+    { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard', roles: ['admin', 'fisherman', 'researcher'] },
+    { to: '/simulation', icon: <Ship size={20} />, label: 'Simulation', roles: ['fisherman'] },
+    { to: '/map', icon: <MapIcon size={20} />, label: 'Zone Map', roles: ['admin', 'fisherman', 'researcher'] },
+    { to: '/alerts', icon: <AlertTriangle size={20} />, label: 'Alerts', roles: ['admin', 'fisherman', 'researcher'] },
+    { to: '/admin', icon: <ShieldAlert size={20} />, label: 'Admin Panel', roles: ['admin'] },
+    { to: '/reports', icon: <FileText size={20} />, label: 'Reports', roles: ['researcher'] },
   ];
+
+  const visibleNavItems = navItems.filter(item => user && item.roles.includes(user.role));
 
   return (
     <aside className="w-64 h-[calc(100vh-2rem)] m-4 clay-card flex flex-col p-6 sticky top-4">
@@ -29,7 +34,7 @@ export const Sidebar: React.FC = () => {
       </div>
 
       <nav className="flex flex-col gap-4 flex-1">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -50,11 +55,11 @@ export const Sidebar: React.FC = () => {
       <div className="mt-auto pt-6 border-t border-white/30">
         <div className="clay-inset p-4 flex items-center gap-3">
            <div className="w-10 h-10 rounded-full bg-ocean-200 flex items-center justify-center font-bold text-ocean-700 shadow-sm border border-white/50">
-             U
+             {user?.name?.charAt(0).toUpperCase() || 'U'}
            </div>
            <div>
-             <p className="text-sm font-semibold text-ocean-900">User Name</p>
-             <p className="text-xs text-slate-500">Fisherman</p>
+             <p className="text-sm font-semibold text-ocean-900">{user?.name || 'User Name'}</p>
+             <p className="text-xs text-slate-500 capitalize">{user?.role || 'Fisherman'}</p>
            </div>
         </div>
       </div>
