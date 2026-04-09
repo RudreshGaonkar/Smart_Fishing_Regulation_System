@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useFishingSession } from '../hooks/useFishingSession';
+import { useFishingSessionContext } from '../context/FishingSessionContext';
 import { CatchForm } from '../components/CatchForm';
 import MapView from '../components/MapView';
 import { fetchZones } from '../services/dataService';
 import type { FishingZone } from '../types/zone.types';
-import { Activity, ShieldAlert, CheckCircle2, AlertTriangle, Anchor, XCircle, Loader2 } from 'lucide-react';
+import { Activity, CheckCircle2, AlertTriangle, Anchor, XCircle, Loader2 } from 'lucide-react';
 
 export const FishingSimulation: React.FC = () => {
-  const { session, startSession, endSession, isActive } = useFishingSession();
+  const {
+    activeSession,
+    isSessionActive,
+    isStarting,
+    startError,
+    startSession,
+    clearSession,
+  } = useFishingSessionContext();
+
   const [zones, setZones] = useState<FishingZone[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<number | undefined>(undefined);
   const [isLoadingZones, setIsLoadingZones] = useState(true);
@@ -19,8 +27,12 @@ export const FishingSimulation: React.FC = () => {
       .finally(() => setIsLoadingZones(false));
   }, []);
 
-  const handleStartSimulation = (zoneId: number, effortLevel: 'low' | 'medium' | 'high', departurePort: string) => {
-    startSession({ zone_id: zoneId, effort_level: effortLevel, departure_port: departurePort });
+  const handleStartSimulation = (
+    zoneId: number,
+    effortLevel: 'low' | 'medium' | 'high',
+    departurePort: string,
+  ) => {
+    void startSession({ zone_id: zoneId, effort_level: effortLevel, departure_port: departurePort });
   };
 
   return (
@@ -34,19 +46,19 @@ export const FishingSimulation: React.FC = () => {
 
         {/* Left Column - Form & Controls */}
         <div className="flex flex-col gap-6 h-full">
-          {session.error && (
+          {startError && (
             <div className="clay-card p-4 bg-red-50 border border-red-200 flex items-center gap-3 text-red-700 rounded-2xl">
               <XCircle size={20} />
-              <span className="font-semibold text-sm">{session.error}</span>
+              <span className="font-semibold text-sm">{startError}</span>
             </div>
           )}
 
-          {!isActive ? (
-            <CatchForm 
+          {!isSessionActive ? (
+            <CatchForm
               zones={zones}
-              onSubmit={handleStartSimulation} 
+              onSubmit={handleStartSimulation}
               onZoneSelect={setSelectedZoneId}
-              isLoading={session.isLoading || isLoadingZones} 
+              isLoading={isStarting || isLoadingZones}
             />
           ) : (
             <div className="clay-card p-8 w-full bg-ocean-50">
@@ -54,50 +66,30 @@ export const FishingSimulation: React.FC = () => {
                 Session Underway
               </h3>
               <div className="clay-inset rounded-2xl p-4 mb-6 flex flex-col gap-2 text-sm font-medium text-ocean-800">
-                <p><span className="font-bold">Session ID:</span> #{session.sessionId}</p>
-                <p><span className="font-bold">Zone ID:</span> {session.zoneId}</p>
-                {session.departurePort && (
+                <p><span className="font-bold">Session ID:</span> #{activeSession?.session_id}</p>
+                <p><span className="font-bold">Zone:</span> {activeSession?.zone_name || `Zone #${activeSession?.zone_id}`}</p>
+                {activeSession?.departure_port && (
                   <p className="flex items-center gap-2">
                     <Anchor size={14} />
-                    <span className="font-bold">Departed from:</span> {session.departurePort}
+                    <span className="font-bold">Departed from:</span> {activeSession.departure_port}
                   </p>
                 )}
-                <p><span className="font-bold">Effort:</span> {session.effortLevel}</p>
+                <p><span className="font-bold">Effort:</span> {activeSession?.effort_level}</p>
               </div>
 
-              {/* Live Status readout inside the active state */}
+              {/* Live Status Readout */}
               <div className="mb-6 flex flex-col gap-4">
-                {session.lastCatchResult ? (
-                  session.lastCatchResult.is_within_limit ? (
-                     <div className="flex items-center gap-4 p-4 clay-inset rounded-2xl bg-green-50/80 border border-green-200">
-                       <CheckCircle2 size={32} className="text-green-500 flex-shrink-0" />
-                       <div>
-                         <p className="font-bold text-green-900 text-lg">Within Limit</p>
-                         <p className="text-sm text-green-800 font-medium">{session.lastCatchResult.message}</p>
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="flex items-center gap-4 p-4 clay-inset rounded-2xl bg-red-50/80 border border-red-200">
-                       <AlertTriangle size={32} className="text-red-500 flex-shrink-0" />
-                       <div>
-                         <p className="font-bold text-red-900 text-lg">Limit Exceeded</p>
-                         <p className="text-sm text-red-800 font-medium">{session.lastCatchResult.message}</p>
-                       </div>
-                     </div>
-                   )
-                 ) : (
-                   <div className="flex items-center gap-4 p-4 clay-inset rounded-2xl bg-white/50">
-                     <CheckCircle2 size={32} className="text-green-500 flex-shrink-0" />
-                     <div>
-                       <p className="font-bold text-ocean-900 text-lg">Session Active</p>
-                       <p className="text-sm text-slate-500 font-medium">Monitoring connection established.</p>
-                     </div>
-                   </div>
-                 )}
+                <div className="flex items-center gap-4 p-4 clay-inset rounded-2xl bg-white/50">
+                  <CheckCircle2 size={32} className="text-green-500 flex-shrink-0" />
+                  <div>
+                    <p className="font-bold text-ocean-900 text-lg">Session Active</p>
+                    <p className="text-sm text-slate-500 font-medium">Monitoring connection established.</p>
+                  </div>
+                </div>
               </div>
 
               <button
-                onClick={endSession}
+                onClick={clearSession}
                 className="clay-button w-full h-14 text-lg bg-gradient-to-br from-red-400 to-red-500 text-white border-red-300 shadow-[4px_4px_8px_#b6cedd,-4px_-4px_8px_#ffffff] hover:shadow-[2px_2px_4px_#b6cedd,-2px_-2px_4px_#ffffff]"
               >
                 Cease Operations
@@ -113,13 +105,13 @@ export const FishingSimulation: React.FC = () => {
                <h2 className="text-xl font-extrabold text-ocean-900 flex items-center gap-2">
                  <Activity className="text-ocean-500" /> Tactical Grid View
                </h2>
-               {isActive && (
+               {isSessionActive && (
                  <span className="bg-red-100/80 text-red-700 px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest animate-pulse border border-red-200">
                    Live Tracking
                  </span>
                )}
             </div>
-            
+
             <div className="flex-1 mt-2 relative rounded-2xl overflow-hidden">
                {isLoadingZones ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-ocean-50/80 z-10 backdrop-blur-sm">
@@ -129,9 +121,9 @@ export const FishingSimulation: React.FC = () => {
                      </div>
                   </div>
                ) : (
-                  <MapView 
-                    zones={zones} 
-                    highlightedZoneId={isActive ? (session.zoneId || selectedZoneId) : selectedZoneId} 
+                  <MapView
+                    zones={zones}
+                    highlightedZoneId={isSessionActive ? (activeSession?.zone_id ?? selectedZoneId) : selectedZoneId}
                   />
                )}
             </div>

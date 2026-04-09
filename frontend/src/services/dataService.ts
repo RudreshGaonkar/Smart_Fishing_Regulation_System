@@ -73,6 +73,8 @@ export interface CreateSpeciesPayload {
   risk_level: number;
   min_catch_size_cm?: number;
   daily_catch_limit?: number;
+  initial_stock?: number;
+  zone_id?: number;
 }
 
 export interface UpdateCatchLimitPayload {
@@ -166,6 +168,22 @@ export const fetchDashboardStats = async (): Promise<DashboardStats> => {
 };
 
 // ── Simulation ────────────────────────────────────────────────────────────────
+
+export interface MyActiveSession {
+  session_id: number;
+  user_id: number;
+  zone_id: number;
+  zone_name: string;
+  departure_port: string | null;
+  effort_level: 'low' | 'medium' | 'high';
+  status: 'active';
+  started_at: string;
+}
+
+export const fetchMyActiveSession = async (): Promise<MyActiveSession | null> => {
+  const { data } = await api.get<{ activeSession: MyActiveSession | null }>('/sessions/me/active');
+  return data.activeSession;
+};
 
 export const startSession = async (payload: StartSessionPayload) => {
   const { data } = await api.post('/sessions', payload);

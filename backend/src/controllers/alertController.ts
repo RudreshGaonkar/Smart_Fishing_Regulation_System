@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { pool } from '../config/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { AlertPriorityQueue, RiskAlertRecord } from '../dsa/priorityQueue';
 
 // GET /api/alerts
 export const getAllAlerts = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -11,10 +12,26 @@ export const getAllAlerts = async (req: AuthRequest, res: Response): Promise<voi
        FROM risk_alerts ra
        LEFT JOIN fishing_zones fz ON ra.zone_id = fz.zone_id
        LEFT JOIN fish_species fs ON ra.species_id = fs.species_id
+       WHERE ra.is_resolved = FALSE
        ORDER BY ra.created_at DESC
        LIMIT 100`
     );
-    res.status(200).json(alerts);
+
+    // Enforce Priority Queue logic before sending to client
+    const pq = new AlertPriorityQueue();
+    for (const alert of alerts) {
+      pq.insert(alert as RiskAlertRecord);
+    }
+
+    const sortedAlerts: RiskAlertRecord[] = [];
+    while (!pq.isEmpty()) {
+      const maxAlert = pq.extractMax();
+      if (maxAlert) {
+        sortedAlerts.push(maxAlert);
+      }
+    }
+
+    res.status(200).json(sortedAlerts);
   } catch (error: any) {
     console.error('getAllAlerts error:', error.message);
     res.status(500).json({ error: 'Internal server error' });

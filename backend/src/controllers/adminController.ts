@@ -2,6 +2,8 @@ import { Response } from 'express';
 import { pool } from '../config/db';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { RiskDetectionService } from '../services/riskDetectionService';
+import { ZoneSuggestionService } from '../services/zoneSuggestionService';
 
 // POST /api/admin/zones
 export const createZone = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -19,7 +21,20 @@ export const createZone = async (req: AuthRequest, res: Response): Promise<void>
       [zone_name, zone_code, description || null, latitude, longitude, area_km2 || null, depth_m || null, zone_type, water_type || 'ocean', port_id || null]
     );
 
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM fishing_zones WHERE zone_id = ?', [result.insertId]);
+    const insertId = result.insertId;
+
+    // ── Bind to Graph ─────────────────────────────────────────────────────────
+    // Automatically span edges to the 3 closest nodes so the BF Algorithm doesn't break
+    try {
+      if (latitude !== undefined && longitude !== undefined) {
+        await ZoneSuggestionService.calculateAndInsertEdges(insertId, parseFloat(latitude), parseFloat(longitude));
+      }
+    } catch (edgeError) {
+      // Swallowed: Non-fatal since node was inserted, but graph edge logic failed
+      console.error('[AdminController] Failed to bind edges for new zone:', edgeError);
+    }
+
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM fishing_zones WHERE zone_id = ?', [insertId]);
 
     res.status(201).json(rows[0]);
   } catch (error: any) {
@@ -58,7 +73,7 @@ export const createSpecies = async (req: AuthRequest, res: Response): Promise<vo
 
     const speciesId = result.insertId;
 
-    // Seed population row if zone_id is provided
+      // Seed population row if zone_id is provided
     if (zone_id && initial_stock !== undefined) {
       await connection.query(
         `INSERT INTO fish_population (zone_id, species_id, current_stock, estimated_total, risk_status)
@@ -68,10 +83,24 @@ export const createSpecies = async (req: AuthRequest, res: Response): Promise<vo
       );
     }
 
+    // ── Commit the species + population transaction first ─────────────────────
     await connection.commit();
 
     const [rows] = await connection.query<RowDataPacket[]>('SELECT * FROM fish_species WHERE species_id = ?', [speciesId]);
     res.status(201).json(rows[0]);
+
+    // ── Fire-and-forget: alert evaluation AFTER commit (isolated try/catch) ───
+    // This ensures a failed alert write NEVER rolls back the species creation.
+    if (zone_id) {
+      try {
+        const riskLevelStr = (risk_level ?? 0).toString();
+        const statusStr    = is_protected ? 'protected' : 'normal';
+        await RiskDetectionService.evaluateBaselineRisk(speciesId, zone_id, riskLevelStr, statusStr);
+      } catch (alertErr) {
+        // Non-fatal — species was already committed and response sent
+        console.error('[AdminController] Alert generation failed after species creation:', alertErr);
+      }
+    }
 
   } catch (error: any) {
     await connection.rollback();

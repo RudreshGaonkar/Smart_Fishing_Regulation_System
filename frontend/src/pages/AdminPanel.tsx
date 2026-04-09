@@ -66,7 +66,7 @@ export const AdminPanel: React.FC = () => {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   };
 
-  const handleLocationSelect = (lat: number, lng: number) => {
+  const handleLocationSelect = (lat: number, lng: number, address?: string) => {
     let nearestPort: Port | null = null;
     let minDistance = Infinity;
     
@@ -79,13 +79,21 @@ export const AdminPanel: React.FC = () => {
     });
 
     setZoneForm(prev => {
-      let newName = prev.zone_name || 'New Zone';
+      let newName = prev.zone_name || address || 'New Zone';
+      
+      // Override 'New Zone' if we successfully geocoded a real name context
+      if (prev.zone_name === 'New Zone' && address) {
+        newName = address;
+      }
+
+      // If we are extremely close to a port, prefix the port name
       if (nearestPort && minDistance < 50) {
         const prefix = nearestPort.name.split(' ')[0];
         if (!newName.startsWith(prefix)) {
           newName = `${prefix} - ${newName.replace(/^(.*? - )/, '')}`;
         }
       }
+
       return { 
         ...prev, 
         latitude: Number(lat.toFixed(6)), 
@@ -126,6 +134,12 @@ export const AdminPanel: React.FC = () => {
     try {
       const created = await createSpecies(speciesForm as CreateSpeciesPayload);
       setSpecies((prev) => [...prev, created]);
+
+      // Sequential await — ensure alert feed reflects any baseline risk alerts
+      // generated server-side before closing the modal
+      const freshAlerts = await fetchAlerts();
+      setAlerts(freshAlerts);
+
       setShowSpeciesModal(false);
       setSpeciesForm({ risk_level: 0, is_protected: false });
     } catch (err: any) {
@@ -282,7 +296,12 @@ export const AdminPanel: React.FC = () => {
             <form onSubmit={handleCreateZone} className="flex flex-col gap-4 pb-4">
               {formError && <p className="text-red-500 text-sm font-semibold">{formError}</p>}
               
-              <ZoneCreationMap onLocationSelect={handleLocationSelect} lat={zoneForm.latitude} lng={zoneForm.longitude} />
+              <ZoneCreationMap 
+                onLocationSelect={handleLocationSelect} 
+                lat={zoneForm.latitude} 
+                lng={zoneForm.longitude} 
+                existingZones={zones} 
+              />
 
               {[
                 { label: 'Zone Name', key: 'zone_name', type: 'text', placeholder: 'e.g. Coastal Alpha' },
@@ -377,7 +396,27 @@ export const AdminPanel: React.FC = () => {
                   onChange={(e) => setSpeciesForm((p) => ({ ...p, risk_level: parseInt(e.target.value) }))} />
               </div>
             </div>
-            <label className="flex items-center gap-3 text-sm font-bold text-ocean-800 cursor-pointer ml-1">
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">Seed in Zone (optional)</label>
+                <div className="clay-inset rounded-xl">
+                  <select className={inputCls} value={speciesForm.zone_id || ''}
+                    onChange={(e) => setSpeciesForm((p) => ({ ...p, zone_id: e.target.value ? parseInt(e.target.value) : undefined }))}>
+                    <option value="">None</option>
+                    {zones.map((z) => <option key={z.zone_id} value={z.zone_id}>{z.zone_name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">Initial Stock</label>
+                <div className="clay-inset rounded-xl">
+                  <input type="number" min={0} className={inputCls} placeholder="e.g. 5000" disabled={!speciesForm.zone_id}
+                    onChange={(e) => setSpeciesForm((p) => ({ ...p, initial_stock: parseInt(e.target.value) }))} />
+                </div>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-3 text-sm font-bold text-ocean-800 cursor-pointer ml-1 mt-2">
               <input type="checkbox" checked={speciesForm.is_protected}
                 onChange={(e) => setSpeciesForm((p) => ({ ...p, is_protected: e.target.checked }))} className="w-4 h-4 accent-ocean-500" />
               Mark as Protected Species

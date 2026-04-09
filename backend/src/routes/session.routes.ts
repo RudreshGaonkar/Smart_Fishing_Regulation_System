@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { verifyToken } from '../middleware/authMiddleware';
-import { startSession } from '../controllers/sessionController';
+import { startSession, getMyActiveSession } from '../controllers/sessionController';
 import { recordCatch } from '../controllers/catchController';
 
 const router = Router();
 
-// Start a session
+// Get the current user's active session (must be before /:id routes)
+router.get('/me/active', verifyToken, getMyActiveSession);
+
+// Start a new session
 router.post('/', verifyToken, startSession);
 
 // Record a catch in a specific session
