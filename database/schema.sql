@@ -48,6 +48,18 @@ CREATE TABLE fish_species (
 );
 
 -- ============================================================
+-- 2.5 PORTS
+--     Master list of ports for zone anchoring
+-- ============================================================
+CREATE TABLE ports (
+  port_id       INT             UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(100)    NOT NULL,
+  latitude      DECIMAL(10,7)   NOT NULL,
+  longitude     DECIMAL(10,7)   NOT NULL,
+  created_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
 -- 3. FISHING_ZONES
 --    Geographic zones; graph edges stored in zone_adjacency
 -- ============================================================
@@ -61,9 +73,13 @@ CREATE TABLE fishing_zones (
   area_km2      DECIMAL(10,2),
   depth_m       DECIMAL(7,2)    COMMENT 'Average water depth',
   zone_type     ENUM('open','restricted','protected','closed') NOT NULL DEFAULT 'open',
+  water_type    ENUM('ocean','river','estuary','backwater') NOT NULL DEFAULT 'ocean',
+  port_id       INT UNSIGNED,
   is_active     BOOLEAN         NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  updated_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  CONSTRAINT fk_zone_port FOREIGN KEY (port_id) REFERENCES ports(port_id) ON DELETE SET NULL
 );
 
 -- ============================================================

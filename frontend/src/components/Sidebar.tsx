@@ -6,7 +6,8 @@ import {
   Ship, 
   AlertTriangle, 
   ShieldAlert, 
-  FileText 
+  FileText,
+  Activity
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -14,12 +15,13 @@ export const Sidebar: React.FC = () => {
   const { user } = useAuth();
 
   const navItems = [
-    { to: '/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard', roles: ['admin', 'fisherman', 'researcher'] },
-    { to: '/simulation', icon: <Ship size={20} />, label: 'Simulation', roles: ['fisherman'] },
-    { to: '/map', icon: <MapIcon size={20} />, label: 'Zone Map', roles: ['admin', 'fisherman', 'researcher'] },
-    { to: '/alerts', icon: <AlertTriangle size={20} />, label: 'Alerts', roles: ['admin', 'fisherman', 'researcher'] },
-    { to: '/admin', icon: <ShieldAlert size={20} />, label: 'Admin Panel', roles: ['admin'] },
-    { to: '/reports', icon: <FileText size={20} />, label: 'Reports', roles: ['researcher'] },
+    { to: '/dashboard',  icon: <LayoutDashboard size={20} />, label: 'Dashboard',   roles: ['admin', 'fisherman', 'researcher'] },
+    { to: '/simulation', icon: <Ship size={20} />,             label: 'Simulation',  roles: ['fisherman'] },
+    { to: '/map',        icon: <MapIcon size={20} />,          label: 'Zone Map',    roles: ['admin', 'fisherman', 'researcher'] },
+    { to: '/alerts',     icon: <AlertTriangle size={20} />,    label: 'Alerts',      roles: ['admin', 'fisherman', 'researcher'] },
+    { to: '/admin',      icon: <ShieldAlert size={20} />,      label: 'Admin Panel', roles: ['admin'] },
+    { to: '/monitoring', icon: <Activity size={20} />,         label: 'Live Monitor',roles: ['admin'] },
+    { to: '/reports',    icon: <FileText size={20} />,         label: 'Reports',     roles: ['researcher'] },
   ];
 
   const visibleNavItems = navItems.filter(item => user && item.roles.includes(user.role));

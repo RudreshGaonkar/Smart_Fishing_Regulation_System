@@ -7,6 +7,8 @@ import alertRoutes    from './routes/alert.routes';
 import fishRoutes     from './routes/fish.routes';
 import adminRoutes    from './routes/admin.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import portRoutes     from './routes/port.routes';
+import monitoringRoutes from './routes/monitoring.routes';
 
 const app = express();
 
@@ -28,6 +30,8 @@ app.use('/api/alerts',    alertRoutes);
 
 // Admin CRUD
 app.use('/api/admin',     adminRoutes);
+app.use('/api/admin/ports', portRoutes);
+app.use('/api/admin/monitoring', monitoringRoutes);
 
 // Research Analytics
 app.use('/api/analytics', analyticsRoutes);

@@ -1,4 +1,9 @@
+// ============================================================
+// Zone Types — frontend/src/types/zone.types.ts
+// ============================================================
+
 export type ZoneType = 'open' | 'restricted' | 'protected' | 'closed';
+export type WaterType = 'ocean' | 'river' | 'estuary' | 'backwater';
 
 export interface FishingZone {
   zone_id: number;
@@ -10,6 +15,8 @@ export interface FishingZone {
   area_km2: number | null;
   depth_m: number | null;
   zone_type: ZoneType;
+  water_type: WaterType;
+  port_id: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

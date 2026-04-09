@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { RiskBadge } from '../components/RiskBadge';
 import { Settings, Edit2, CheckCircle, ShieldAlert, Plus, X, Loader2 } from 'lucide-react';
 import {
-  fetchZones, fetchAlerts, fetchSpecies,
+  fetchZones, fetchAlerts, fetchSpecies, fetchPorts,
   createZone, createSpecies, resolveAlert, updateCatchLimit,
 } from '../services/dataService';
-import type { CreateZonePayload, CreateSpeciesPayload, UpdateCatchLimitPayload } from '../services/dataService';
+import type { CreateZonePayload, CreateSpeciesPayload, UpdateCatchLimitPayload, Port } from '../services/dataService';
+import { ZoneCreationMap } from '../components/ZoneCreationMap';
 import type { FishingZone } from '../types/zone.types';
 import type { FishSpecies } from '../types/fish.types';
 import type { RiskAlert } from '../types/alert.types';
@@ -32,6 +33,7 @@ export const AdminPanel: React.FC = () => {
   const [zones, setZones] = useState<FishingZone[]>([]);
   const [alerts, setAlerts] = useState<RiskAlert[]>([]);
   const [species, setSpecies] = useState<FishSpecies[]>([]);
+  const [ports, setPorts] = useState<Port[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
 
@@ -41,18 +43,58 @@ export const AdminPanel: React.FC = () => {
   const [showLimitModal, setShowLimitModal] = useState(false);
 
   // Form states
-  const [zoneForm, setZoneForm] = useState<Partial<CreateZonePayload>>({ zone_type: 'open' });
+  const [zoneForm, setZoneForm] = useState<Partial<CreateZonePayload>>({ zone_type: 'open', water_type: 'ocean' });
   const [speciesForm, setSpeciesForm] = useState<Partial<CreateSpeciesPayload>>({ risk_level: 0, is_protected: false });
   const [limitForm, setLimitForm] = useState<Partial<UpdateCatchLimitPayload>>({ user_role: 'all', max_per_day: 10, effective_from: new Date().toISOString().split('T')[0] });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([fetchZones(), fetchAlerts(), fetchSpecies()])
-      .then(([z, a, s]) => { setZones(z); setAlerts(a); setSpecies(s); })
+    Promise.all([fetchZones(), fetchAlerts(), fetchSpecies(), fetchPorts()])
+      .then(([z, a, s, p]) => { setZones(z); setAlerts(a); setSpecies(s); setPorts(p); })
       .catch(console.error)
       .finally(() => setIsLoading(false));
   }, []);
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
+  const handleLocationSelect = (lat: number, lng: number) => {
+    let nearestPort: Port | null = null;
+    let minDistance = Infinity;
+    
+    ports.forEach(port => {
+      const dist = calculateDistance(lat, lng, port.latitude, port.longitude);
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearestPort = port;
+      }
+    });
+
+    setZoneForm(prev => {
+      let newName = prev.zone_name || 'New Zone';
+      if (nearestPort && minDistance < 50) {
+        const prefix = nearestPort.name.split(' ')[0];
+        if (!newName.startsWith(prefix)) {
+          newName = `${prefix} - ${newName.replace(/^(.*? - )/, '')}`;
+        }
+      }
+      return { 
+        ...prev, 
+        latitude: Number(lat.toFixed(6)), 
+        longitude: Number(lng.toFixed(6)),
+        port_id: nearestPort ? nearestPort.port_id : undefined,
+        zone_name: newName
+      };
+    });
+  };
 
   const pendingAlerts = alerts.filter((a) => !a.is_resolved);
 
@@ -72,7 +114,7 @@ export const AdminPanel: React.FC = () => {
       const created = await createZone(zoneForm as CreateZonePayload);
       setZones((prev) => [...prev, created]);
       setShowZoneModal(false);
-      setZoneForm({ zone_type: 'open' });
+      setZoneForm({ zone_type: 'open', water_type: 'ocean' });
     } catch (err: any) {
       setFormError(err.response?.data?.error || 'Failed to create zone');
     } finally { setFormLoading(false); }
@@ -236,36 +278,78 @@ export const AdminPanel: React.FC = () => {
 
       {showZoneModal && (
         <ModalWrap title="Add New Fishing Zone" onClose={() => setShowZoneModal(false)}>
-          <form onSubmit={handleCreateZone} className="flex flex-col gap-4">
-            {formError && <p className="text-red-500 text-sm font-semibold">{formError}</p>}
-            {[
-              { label: 'Zone Name', key: 'zone_name', type: 'text', placeholder: 'e.g. Coastal Alpha' },
-              { label: 'Zone Code', key: 'zone_code', type: 'text', placeholder: 'e.g. CA-01' },
-              { label: 'Latitude', key: 'latitude', type: 'number', placeholder: '15.4909' },
-              { label: 'Longitude', key: 'longitude', type: 'number', placeholder: '73.8278' },
-            ].map(({ label, key, type, placeholder }) => (
-              <div key={key} className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">{label}</label>
-                <div className="clay-inset rounded-xl">
-                  <input required type={type} placeholder={placeholder} className={inputCls}
-                    onChange={(e) => setZoneForm((p) => ({ ...p, [key]: type === 'number' ? parseFloat(e.target.value) : e.target.value }))} />
+          <div className="max-h-[85vh] overflow-y-auto pr-2 -mr-2">
+            <form onSubmit={handleCreateZone} className="flex flex-col gap-4 pb-4">
+              {formError && <p className="text-red-500 text-sm font-semibold">{formError}</p>}
+              
+              <ZoneCreationMap onLocationSelect={handleLocationSelect} lat={zoneForm.latitude} lng={zoneForm.longitude} />
+
+              {[
+                { label: 'Zone Name', key: 'zone_name', type: 'text', placeholder: 'e.g. Coastal Alpha' },
+                { label: 'Zone Code', key: 'zone_code', type: 'text', placeholder: 'e.g. CA-01' },
+              ].map(({ label, key, type, placeholder }) => (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">{label}</label>
+                  <div className="clay-inset rounded-xl">
+                    <input required type={type} placeholder={placeholder} className={inputCls} value={(zoneForm as any)[key] || ''}
+                      onChange={(e) => setZoneForm((p) => ({ ...p, [key]: e.target.value }))} />
+                  </div>
+                </div>
+              ))}
+              
+              <div className="flex gap-4">
+                {[
+                  { label: 'Latitude', key: 'latitude', type: 'number', placeholder: '15.49' },
+                  { label: 'Longitude', key: 'longitude', type: 'number', placeholder: '73.82' },
+                ].map(({ label, key, type, placeholder }) => (
+                  <div key={key} className="flex flex-col gap-1 flex-1">
+                    <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">{label}</label>
+                    <div className="clay-inset rounded-xl">
+                      <input required type={type} step="any" placeholder={placeholder} className={inputCls} value={(zoneForm as any)[key] || ''}
+                        onChange={(e) => setZoneForm((p) => ({ ...p, [key]: parseFloat(e.target.value) }))} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">Zone Type</label>
+                  <div className="clay-inset rounded-xl">
+                    <select className={inputCls} value={zoneForm.zone_type}
+                      onChange={(e) => setZoneForm((p) => ({ ...p, zone_type: e.target.value as any }))}>
+                      {['open', 'restricted', 'protected', 'closed'].map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">Water Type</label>
+                  <div className="clay-inset rounded-xl">
+                    <select className={inputCls} value={zoneForm.water_type}
+                      onChange={(e) => setZoneForm((p) => ({ ...p, water_type: e.target.value as any }))}>
+                      {['ocean', 'river', 'estuary', 'backwater'].map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
-            ))}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">Zone Type</label>
-              <div className="clay-inset rounded-xl">
-                <select className={inputCls} value={zoneForm.zone_type}
-                  onChange={(e) => setZoneForm((p) => ({ ...p, zone_type: e.target.value as any }))}>
-                  {['open', 'restricted', 'protected', 'closed'].map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">Nearest Port</label>
+                <div className="clay-inset rounded-xl">
+                  <select className={inputCls} value={zoneForm.port_id || ''}
+                    onChange={(e) => setZoneForm((p) => ({ ...p, port_id: e.target.value ? parseInt(e.target.value) : undefined }))}>
+                    <option value="">None / Unknown</option>
+                    {ports.map((p) => <option key={p.port_id} value={p.port_id}>{p.name}</option>)}
+                  </select>
+                </div>
               </div>
-            </div>
-            <button type="submit" disabled={formLoading}
-              className="clay-button h-12 mt-2 bg-ocean-500 text-white border-ocean-400 font-bold hover:bg-ocean-600 flex items-center justify-center gap-2 disabled:opacity-60">
-              {formLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Create Zone
-            </button>
-          </form>
+
+              <button type="submit" disabled={formLoading}
+                className="clay-button h-12 mt-2 bg-ocean-500 text-white border-ocean-400 font-bold hover:bg-ocean-600 flex items-center justify-center gap-2 disabled:opacity-60">
+                {formLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Create Zone
+              </button>
+            </form>
+          </div>
         </ModalWrap>
       )}
 

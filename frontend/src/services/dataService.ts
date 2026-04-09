@@ -5,11 +5,31 @@ import type { RiskAlert } from '../types/alert.types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface Port {
+  port_id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface DashboardStats {
   totalZones: number;
   activeAlerts: number;
   totalSpecies: number;
   activeSessions: number;
+}
+
+export interface ActiveSession {
+  session_id: number;
+  user_id: number;           // raw FK from fishing_sessions
+  fisherman_name: string;    // from JOIN on users
+  zone_id: number;           // raw FK from fishing_sessions
+  zone_name: string;         // from JOIN on fishing_zones
+  latitude: number;
+  longitude: number;
+  started_at: string;
+  duration_minutes: number;  // TIMESTAMPDIFF(MINUTE, started_at, NOW())
+  effort_level: 'low' | 'medium' | 'high';
 }
 
 export interface CatchRecord {
@@ -41,6 +61,8 @@ export interface CreateZonePayload {
   area_km2?: number;
   depth_m?: number;
   zone_type: 'open' | 'restricted' | 'protected' | 'closed';
+  water_type: 'ocean' | 'river' | 'estuary' | 'backwater';
+  port_id?: number;
 }
 
 export interface CreateSpeciesPayload {
@@ -115,6 +137,16 @@ export const fetchAlerts = async (): Promise<RiskAlert[]> => {
 
 export const fetchSpecies = async (): Promise<FishSpecies[]> => {
   const { data } = await api.get('/fish');
+  return data;
+};
+
+export const fetchPorts = async (): Promise<Port[]> => {
+  const { data } = await api.get('/admin/ports').catch(() => ({ data: [] }));
+  return data;
+};
+
+export const fetchActiveSessions = async (): Promise<ActiveSession[]> => {
+  const { data } = await api.get('/admin/monitoring/active').catch(() => ({ data: [] }));
   return data;
 };
 

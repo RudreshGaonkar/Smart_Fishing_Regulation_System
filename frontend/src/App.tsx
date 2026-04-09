@@ -10,6 +10,7 @@ import { Register } from './pages/Register';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { AdminPanel } from './pages/AdminPanel';
+import { MonitoringDashboard } from './pages/MonitoringDashboard';
 
 import { FishingSimulation } from './pages/FishingSimulation';
 import { ZoneMap } from './pages/ZoneMap';
@@ -38,6 +39,7 @@ function App() {
 
               <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
                 <Route path="admin" element={<AdminPanel />} />
+                <Route path="monitoring" element={<MonitoringDashboard />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedRoles={['researcher']} />}>

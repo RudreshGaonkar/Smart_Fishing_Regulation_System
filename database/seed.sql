@@ -10,6 +10,7 @@ TRUNCATE TABLE zone_adjacency;
 TRUNCATE TABLE risk_alerts;
 TRUNCATE TABLE fishing_sessions;
 TRUNCATE TABLE fishing_zones;
+TRUNCATE TABLE ports;
 TRUNCATE TABLE fish_species;
 -- Leaving users untruncated as requested, just inserting new ones
 SET FOREIGN_KEY_CHECKS = 1;
@@ -24,15 +25,24 @@ INSERT IGNORE INTO users (user_id, username, full_name, email, password_hash, ro
 (4, 'mangesh_k', 'Mangesh Kadam', 'mangesh@fisherman.in', '$2a$10$wT333u8A.1uQ/gBv6wT8/e3JkP1.D/R.GvX/b.O/P/k/P/k/P/k/P', 'fisherman');
 
 -- --------------------------------------------------------
+-- 1.5 PORTS (Goa Ports)
+-- --------------------------------------------------------
+INSERT INTO ports (port_id, name, latitude, longitude) VALUES
+(1, 'Panaji Port', 15.5011, 73.8242),
+(2, 'Mormugao Port', 15.3997, 73.7932),
+(3, 'Betul Port', 15.1481, 73.9575),
+(4, 'Old Goa Jetty', 15.5049, 73.9116);
+
+-- --------------------------------------------------------
 -- 2. FISHING ZONES (Goa Coastline)
 -- --------------------------------------------------------
-INSERT INTO fishing_zones (zone_id, zone_name, zone_code, latitude, longitude, zone_type) VALUES
-(1, 'Mandovi Estuary', 'Z-MAN', 15.5036, 73.8058, 'restricted'),
-(2, 'Calangute Inshore', 'Z-CAL', 15.5494, 73.7535, 'open'),
-(3, 'Vasco Deep Sea', 'Z-VAS', 15.3960, 73.7500, 'open'),
-(4, 'Zuari Bay', 'Z-ZUA', 15.4211, 73.8166, 'open'),
-(5, 'Palolem Protected Reef', 'Z-PAL', 15.0100, 74.0232, 'closed'),
-(6, 'Chapora Coast', 'Z-CHA', 15.6061, 73.7360, 'open');
+INSERT INTO fishing_zones (zone_id, zone_name, zone_code, latitude, longitude, zone_type, water_type, port_id) VALUES
+(1, 'Mandovi Estuary', 'Z-MAN', 15.5036, 73.8058, 'restricted', 'estuary', 1),
+(2, 'Calangute Inshore', 'Z-CAL', 15.5494, 73.7535, 'open', 'ocean', 1),
+(3, 'Vasco Deep Sea', 'Z-VAS', 15.3960, 73.7500, 'open', 'ocean', 2),
+(4, 'Zuari Bay', 'Z-ZUA', 15.4211, 73.8166, 'open', 'backwater', 2),
+(5, 'Palolem Protected Reef', 'Z-PAL', 15.0100, 74.0232, 'closed', 'ocean', 3),
+(6, 'Chapora Coast', 'Z-CHA', 15.6061, 73.7360, 'open', 'ocean', 1);
 
 -- --------------------------------------------------------
 -- 3. ZONE ADJACENCY (For BFS/Dijkstra Graph - Distances in KM)

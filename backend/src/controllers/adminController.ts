@@ -6,7 +6,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
 // POST /api/admin/zones
 export const createZone = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type } = req.body;
+    const { zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type, water_type, port_id } = req.body;
 
     if (!zone_name || !zone_code || latitude === undefined || longitude === undefined || !zone_type) {
       res.status(400).json({ error: 'Missing required fields: zone_name, zone_code, latitude, longitude, zone_type' });
@@ -14,9 +14,9 @@ export const createZone = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     const [result] = await pool.query<ResultSetHeader>(
-      `INSERT INTO fishing_zones (zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [zone_name, zone_code, description || null, latitude, longitude, area_km2 || null, depth_m || null, zone_type]
+      `INSERT INTO fishing_zones (zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type, water_type, port_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [zone_name, zone_code, description || null, latitude, longitude, area_km2 || null, depth_m || null, zone_type, water_type || 'ocean', port_id || null]
     );
 
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM fishing_zones WHERE zone_id = ?', [result.insertId]);
@@ -115,7 +115,7 @@ export const setCatchLimit = async (req: AuthRequest, res: Response): Promise<vo
 export const updateZone = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const zoneId = parseInt(req.params.id as string, 10);
-    const { zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type, is_active } = req.body;
+    const { zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type, water_type, port_id, is_active } = req.body;
 
     if (isNaN(zoneId)) {
       res.status(400).json({ error: 'Invalid zone ID' });
@@ -132,9 +132,11 @@ export const updateZone = async (req: AuthRequest, res: Response): Promise<void>
            area_km2 = COALESCE(?, area_km2),
            depth_m = COALESCE(?, depth_m),
            zone_type = COALESCE(?, zone_type),
+           water_type = COALESCE(?, water_type),
+           port_id = COALESCE(?, port_id),
            is_active = COALESCE(?, is_active)
        WHERE zone_id = ?`,
-      [zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type, is_active, zoneId]
+      [zone_name, zone_code, description, latitude, longitude, area_km2, depth_m, zone_type, water_type, port_id, is_active, zoneId]
     );
 
     const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM fishing_zones WHERE zone_id = ?', [zoneId]);
