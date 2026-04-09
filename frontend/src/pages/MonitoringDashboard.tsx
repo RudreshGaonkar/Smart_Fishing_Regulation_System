@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchActiveSessions } from '../services/dataService';
 import type { ActiveSession } from '../services/dataService';
-import { Activity, Clock, Fish, MapPin, RefreshCw, Waves, Users } from 'lucide-react';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { Activity, Clock, Fish, MapPin, RefreshCw, Waves, Users, ChevronDown, ChevronRight } from 'lucide-react';
+import { APIProvider, Map as GoogleMap, AdvancedMarker } from '@vis.gl/react-google-maps';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -19,10 +19,21 @@ const formatDuration = (minutes: number): string => {
   return `${h}h ${m}m`;
 };
 
+// ── Zone Grouping Type ────────────────────────────────────────────────────────
+interface ZoneGroup {
+  zone_id: number;
+  zone_name: string;
+  latitude: number;
+  longitude: number;
+  sessions: ActiveSession[];
+}
+
 export const MonitoringDashboard: React.FC = () => {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ActiveSession | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
+  const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -46,6 +57,46 @@ export const MonitoringDashboard: React.FC = () => {
     const interval = setInterval(load, 30_000);
     return () => clearInterval(interval);
   }, [load]);
+
+  // ── Group sessions by zone_id ────────────────────────────────────────────
+  const zoneGroups: ZoneGroup[] = useMemo(() => {
+    const groupMap = new Map<number, ZoneGroup>();
+    for (const session of sessions) {
+      const existing = groupMap.get(session.zone_id);
+      if (existing) {
+        existing.sessions.push(session);
+      } else {
+        groupMap.set(session.zone_id, {
+          zone_id: session.zone_id,
+          zone_name: session.zone_name,
+          latitude: session.latitude,
+          longitude: session.longitude,
+          sessions: [session],
+        });
+      }
+    }
+    return Array.from(groupMap.values());
+  }, [sessions]);
+
+  // ── Toggle zone expansion in sidebar ─────────────────────────────────────
+  const toggleZoneExpanded = (zoneId: number) => {
+    setExpandedZones((prev) => {
+      const next = new Set(prev);
+      if (next.has(zoneId)) {
+        next.delete(zoneId);
+      } else {
+        next.add(zoneId);
+      }
+      return next;
+    });
+  };
+
+  // Determine the highest effort level in a zone for the marker color
+  const getZoneMaxEffort = (group: ZoneGroup): 'low' | 'medium' | 'high' => {
+    if (group.sessions.some((s) => s.effort_level === 'high')) return 'high';
+    if (group.sessions.some((s) => s.effort_level === 'medium')) return 'medium';
+    return 'low';
+  };
 
   return (
     <div className="flex flex-col gap-8 pb-12">
@@ -97,7 +148,7 @@ export const MonitoringDashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Session List */}
+        {/* Session List — Grouped by Zone */}
         <div className="lg:col-span-2 clay-card p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-extrabold text-ocean-900 flex items-center gap-2">
@@ -121,52 +172,77 @@ export const MonitoringDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="flex flex-col gap-3 overflow-y-auto max-h-[480px] pr-1">
-              {sessions.map((session) => {
-                const isSelected = selectedSession?.session_id === session.session_id;
+              {zoneGroups.map((group) => {
+                const isExpanded = expandedZones.has(group.zone_id);
+                const maxEffort = getZoneMaxEffort(group);
                 return (
-                  <button
-                    key={session.session_id}
-                    onClick={() => setSelectedSession(isSelected ? null : session)}
-                    className={`
-                      w-full text-left clay-inset p-4 rounded-2xl transition-all duration-200
-                      ${isSelected ? 'ring-2 ring-ocean-400 ring-offset-1' : 'hover:scale-[1.01]'}
-                    `}
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <p className="font-extrabold text-ocean-900 text-sm leading-tight">
-                          {session.fisherman_name}
-                        </p>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1">
-                          <MapPin size={10} className="text-ocean-400" />
-                          {session.zone_name}
-                        </p>
+                  <div key={group.zone_id} className="clay-inset rounded-2xl overflow-hidden transition-all duration-200">
+                    {/* Zone Header — clickable to expand/collapse */}
+                    <button
+                      onClick={() => toggleZoneExpanded(group.zone_id)}
+                      className="w-full text-left p-4 flex justify-between items-center gap-2 hover:bg-white/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`
+                          w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0
+                          ${maxEffort === 'high' ? 'bg-red-500' : maxEffort === 'medium' ? 'bg-amber-500' : 'bg-green-500'}
+                        `}>
+                          {group.sessions.length}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-ocean-900 text-sm leading-tight truncate">
+                            {group.zone_name}
+                          </p>
+                          <p className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1">
+                            <Users size={10} className="text-ocean-400 flex-shrink-0" />
+                            {group.sessions.length} {group.sessions.length === 1 ? 'Fisherman' : 'Fishermen'} Active
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${EFFORT_STYLES[session.effort_level] ?? ''}`}>
-                          {session.effort_level}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${EFFORT_STYLES[maxEffort] ?? ''}`}>
+                          {maxEffort === 'high' ? '⚠ High' : maxEffort}
                         </span>
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
-                          <Clock size={10} />
-                          {formatDuration(session.duration_minutes)}
-                        </span>
+                        {isExpanded
+                          ? <ChevronDown size={16} className="text-slate-400" />
+                          : <ChevronRight size={16} className="text-slate-400" />}
                       </div>
-                    </div>
+                    </button>
 
-                    {/* Duration bar */}
-                    <div className="mt-3 w-full h-1.5 bg-white/50 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          session.effort_level === 'high' ? 'bg-red-400' :
-                          session.effort_level === 'medium' ? 'bg-amber-400' : 'bg-green-400'
-                        }`}
-                        style={{ width: `${Math.min((session.duration_minutes / 480) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <p className="text-[9px] text-slate-400 font-medium mt-1 text-right">
-                      {Math.round(Math.min((session.duration_minutes / 480) * 100, 100))}% of 8h max
-                    </p>
-                  </button>
+                    {/* Expanded: Individual fisherman rows */}
+                    {isExpanded && (
+                      <div className="border-t border-white/50 bg-white/20">
+                        {group.sessions.map((session) => {
+                          const isSelected = selectedSession?.session_id === session.session_id;
+                          return (
+                            <button
+                              key={session.session_id}
+                              onClick={() => setSelectedSession(isSelected ? null : session)}
+                              className={`
+                                w-full text-left px-4 py-3 flex justify-between items-center gap-2
+                                border-b border-white/30 last:border-b-0 transition-all duration-150
+                                ${isSelected ? 'bg-ocean-50/50 ring-1 ring-inset ring-ocean-300' : 'hover:bg-white/30'}
+                              `}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0 animate-pulse" />
+                                <div className="min-w-0">
+                                  <p className="font-bold text-ocean-900 text-sm truncate">{session.fisherman_name}</p>
+                                  <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+                                    <Clock size={9} />
+                                    {formatDuration(session.duration_minutes)}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize flex-shrink-0 ${EFFORT_STYLES[session.effort_level] ?? ''}`}>
+                                {session.effort_level}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -185,43 +261,74 @@ export const MonitoringDashboard: React.FC = () => {
               </div>
             ) : (
               <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-                <Map
+                <GoogleMap
                   defaultCenter={{ lat: 15.4909, lng: 73.8278 }}
                   defaultZoom={9}
                   mapId="DEMO_MAP_ID"
                   gestureHandling="greedy"
                   disableDefaultUI={true}
                 >
-                  {sessions.map((session) => {
-                    const lat = Number(session.latitude);
-                    const lng = Number(session.longitude);
+                  {zoneGroups.map((group) => {
+                    const lat = Number(group.latitude);
+                    const lng = Number(group.longitude);
                     if (isNaN(lat) || isNaN(lng)) return null;
-                    const isSelected = selectedSession?.session_id === session.session_id;
+                    const isSelected = selectedZoneId === group.zone_id;
+                    const maxEffort = getZoneMaxEffort(group);
+                    const count = group.sessions.length;
                     return (
                       <AdvancedMarker
-                        key={session.session_id}
+                        key={group.zone_id}
                         position={{ lat, lng }}
                         zIndex={isSelected ? 100 : 1}
-                        onClick={() => setSelectedSession(isSelected ? null : session)}
+                        onClick={() => setSelectedZoneId(isSelected ? null : group.zone_id)}
                       >
                         <div className={`
                           relative flex flex-col items-center transition-transform
                           ${isSelected ? 'scale-125' : 'hover:scale-110'}
                         `}>
+                          {/* Marker Circle — shows count badge */}
                           <div className={`
-                            w-10 h-10 rounded-full border-2 flex items-center justify-center
+                            w-11 h-11 rounded-full border-2 flex items-center justify-center
                             shadow-lg text-white text-xs font-extrabold
-                            ${session.effort_level === 'high' ? 'bg-red-500 border-red-300' :
-                              session.effort_level === 'medium' ? 'bg-amber-500 border-amber-300' :
+                            ${maxEffort === 'high' ? 'bg-red-500 border-red-300' :
+                              maxEffort === 'medium' ? 'bg-amber-500 border-amber-300' :
                               'bg-green-500 border-green-300'}
                             ${isSelected ? 'ring-4 ring-white ring-opacity-70' : ''}
                           `}>
                             🚢
                           </div>
+
+                          {/* Fisherman Count Badge */}
+                          {count > 1 && (
+                            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-ocean-600 border-2 border-white flex items-center justify-center shadow-md">
+                              <span className="text-[9px] font-extrabold text-white leading-none">{count}</span>
+                            </div>
+                          )}
+
+                          {/* Info Tooltip — shows all fishermen when zone is selected */}
                           {isSelected && (
-                            <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-white/95 border border-ocean-200 rounded-xl px-3 py-1.5 shadow-xl whitespace-nowrap pointer-events-none">
-                              <p className="text-xs font-extrabold text-ocean-900">{session.fisherman_name}</p>
-                              <p className="text-[10px] text-slate-500">{session.zone_name} · {formatDuration(session.duration_minutes)}</p>
+                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 -translate-y-full bg-white/95 border border-ocean-200 rounded-xl px-3.5 py-2.5 shadow-xl min-w-[180px] max-w-[260px] pointer-events-none z-50">
+                              <p className="text-xs font-extrabold text-ocean-900 mb-1.5 flex items-center gap-1.5">
+                                <MapPin size={11} className="text-ocean-400" />
+                                {group.zone_name}
+                              </p>
+                              <p className="text-[10px] font-bold text-slate-400 mb-1">
+                                {count} {count === 1 ? 'Fisherman' : 'Fishermen'} Active
+                              </p>
+                              <div className="flex flex-col gap-1">
+                                {group.sessions.map((s) => (
+                                  <div key={s.session_id} className="flex justify-between items-center gap-2 bg-slate-50/80 rounded-lg px-2 py-1">
+                                    <span className="text-[10px] font-bold text-ocean-800 truncate">{s.fisherman_name}</span>
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border capitalize ${EFFORT_STYLES[s.effort_level] ?? ''}`}>
+                                        {s.effort_level}
+                                      </span>
+                                      <span className="text-[9px] text-slate-400 font-medium">{formatDuration(s.duration_minutes)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {/* Tooltip Arrow */}
                               <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-b border-r border-ocean-200 rotate-45" />
                             </div>
                           )}
@@ -232,7 +339,7 @@ export const MonitoringDashboard: React.FC = () => {
                       </AdvancedMarker>
                     );
                   })}
-                </Map>
+                </GoogleMap>
               </APIProvider>
             )}
           </div>

@@ -4,62 +4,64 @@
 
 @layer base {
   body {
-    @apply bg-ocean-50 text-slate-800 antialiased min-h-screen font-sans;
+    @apply bg-slate-200 text-slate-900 antialiased min-h-screen font-sans;
   }
 }
 
 @layer components {
   /* Core Claymorphism Component */
   .clay-card {
-    @apply bg-ocean-50 rounded-3xl border border-white/40 backdrop-blur-md;
+    @apply bg-slate-200 rounded-3xl border border-white/40 backdrop-blur-md;
     box-shadow: 
-      10px 10px 20px #b6cedd,
-      -10px -10px 20px #ffffff,
-      inset 2px 2px 5px rgba(255, 255, 255, 0.7),
-      inset -2px -2px 5px rgba(0, 0, 0, 0.05);
+      12px 12px 24px #94a3b8,
+      -12px -12px 24px #ffffff,
+      inset 2px 2px 5px rgba(255, 255, 255, 0.8),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease-in-out;
   }
 
   /* Interactive Clay Button */
   .clay-button {
-    @apply bg-ocean-50 rounded-2xl font-semibold text-ocean-700 active:scale-95 border border-white/50 flex items-center justify-center gap-2 transition-all duration-300;
+    @apply bg-slate-200 rounded-2xl font-bold text-ocean-900 active:scale-95 border border-white/50 flex items-center justify-center gap-2 transition-all duration-300;
     box-shadow: 
-      6px 6px 12px #b6cedd,
-      -6px -6px 12px #ffffff,
-      inset 1px 1px 3px rgba(255, 255, 255, 0.8),
-      inset -1px -1px 3px rgba(0, 0, 0, 0.05);
+      8px 8px 16px #94a3b8,
+      -8px -8px 16px #ffffff,
+      inset 1px 1px 3px rgba(255, 255, 255, 0.9),
+      inset -1px -1px 3px rgba(0, 0, 0, 0.08);
   }
 
+  /* Strict High-Contrast Hover Rule */
   .clay-button:hover {
     box-shadow: 
-      4px 4px 8px #b6cedd,
+      4px 4px 8px #94a3b8,
       -4px -4px 8px #ffffff,
-      inset 2px 2px 5px rgba(255, 255, 255, 0.8),
-      inset -2px -2px 5px rgba(0, 0, 0, 0.05);
-    @apply text-ocean-600 bg-ocean-100/50;
+      inset 2px 2px 5px rgba(255, 255, 255, 0.2),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.4);
+    @apply text-white bg-ocean-800 border-ocean-700/50;
   }
 
   .clay-button:active {
     box-shadow: 
-      inset 4px 4px 8px #b6cedd,
-      inset -4px -4px 8px #ffffff;
+      inset 4px 4px 8px #0f172a,
+      inset -4px -4px 8px rgba(255,255,255, 0.1);
+    @apply bg-ocean-900;
   }
 
-  /* Inner Clay Container (e.g. for input fields or nested areas) */
+  /* Inner Clay Container */
   .clay-inset {
-    @apply bg-ocean-50 rounded-2xl border border-white/20;
+    @apply bg-slate-200 rounded-2xl border border-white/30;
     box-shadow: 
-      inset 5px 5px 10px #b6cedd,
-      inset -5px -5px 10px #ffffff;
+      inset 6px 6px 12px #94a3b8,
+      inset -6px -6px 12px #ffffff;
   }
 
   /* Accent Clay (Primary color pop) */
   .clay-accent {
-    @apply bg-ocean-500 text-white rounded-3xl border border-ocean-300;
+    @apply bg-ocean-700 text-white rounded-3xl border border-ocean-500;
     box-shadow: 
-      8px 8px 16px #0369a1,
-      -8px -8px 16px #38bdf8,
-      inset 2px 2px 5px rgba(255, 255, 255, 0.4),
-      inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+      8px 8px 16px #94a3b8,
+      -8px -8px 16px #ffffff,
+      inset 2px 2px 5px rgba(255, 255, 255, 0.3),
+      inset -2px -2px 5px rgba(0, 0, 0, 0.4);
   }
 }

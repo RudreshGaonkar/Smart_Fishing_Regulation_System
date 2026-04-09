@@ -17,7 +17,7 @@ export class MonitoringService {
       SELECT
         fs.session_id,
         fs.user_id,
-        u.full_name            AS fisherman_name,
+        COALESCE(u.full_name, u.username) AS fisherman_name,
         fs.zone_id,
         fz.zone_name,
         fz.latitude,
