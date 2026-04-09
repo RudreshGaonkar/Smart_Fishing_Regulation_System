@@ -132,9 +132,34 @@ export const fetchZones = async (): Promise<FishingZone[]> => {
   return data;
 };
 
+export const fetchZoneRecommendation = async (zoneId: number): Promise<{ message: string, recommendation: FishingZone | null, distance_km: number }> => {
+  const { data } = await api.get(`/zones/${zoneId}/recommendation`);
+  return data;
+};
+
 export const fetchAlerts = async (): Promise<RiskAlert[]> => {
   const { data } = await api.get('/alerts');
   return data;
+};
+
+export interface CreatePortPayload {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+export const createPort = async (payload: CreatePortPayload): Promise<Port> => {
+  const { data } = await api.post('/admin/ports', payload);
+  return data;
+};
+
+export const updatePort = async (portId: number, payload: Partial<CreatePortPayload>): Promise<Port> => {
+  const { data } = await api.put(`/admin/ports/${portId}`, payload);
+  return data;
+};
+
+export const deletePort = async (portId: number): Promise<void> => {
+  await api.delete(`/admin/ports/${portId}`);
 };
 
 export const fetchSpecies = async (): Promise<FishSpecies[]> => {

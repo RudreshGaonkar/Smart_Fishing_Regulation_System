@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import React, { useState, useEffect } from 'react';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import type { FishingZone, WaterType } from '../types/zone.types';
 
 interface MapViewProps {
   zones: FishingZone[];
   highlightedZoneId?: number;
+  recommendedZoneId?: number;
   onZoneClick?: (zone: FishingZone) => void;
 }
+
+const RecommendationLine: React.FC<{ from: {lat: number, lng: number}, to: {lat: number, lng: number} }> = ({ from, to }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !(window as any).google) return;
+    const polyline = new (window as any).google.maps.Polyline({
+      path: [from, to],
+      geodesic: true,
+      strokeColor: '#10b981', // emerald-500
+      strokeOpacity: 0.8,
+      strokeWeight: 4,
+    });
+    polyline.setMap(map);
+    return () => polyline.setMap(null);
+  }, [map, from, to]);
+  return null;
+};
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -24,8 +42,11 @@ const WATER_TYPE_ICON: Record<WaterType, string> = {
   backwater: '🪷',
 };
 
-const MapView: React.FC<MapViewProps> = ({ zones, highlightedZoneId, onZoneClick }) => {
+const MapView: React.FC<MapViewProps> = ({ zones, highlightedZoneId, recommendedZoneId, onZoneClick }) => {
   const [tooltipZoneId, setTooltipZoneId] = useState<number | null>(null);
+
+  const highlightedZone = zones.find(z => z.zone_id === highlightedZoneId);
+  const recommendedZone = zones.find(z => z.zone_id === recommendedZoneId);
 
   const getStyles = (type: string, isHighlighted: boolean) => {
     if (isHighlighted) {
@@ -120,6 +141,25 @@ const MapView: React.FC<MapViewProps> = ({ zones, highlightedZoneId, onZoneClick
               </AdvancedMarker>
             );
           })}
+
+          {/* Graph Connection Line */}
+          {highlightedZone && recommendedZone && (
+            <RecommendationLine 
+               from={{ lat: Number(highlightedZone.latitude), lng: Number(highlightedZone.longitude) }} 
+               to={{ lat: Number(recommendedZone.latitude), lng: Number(recommendedZone.longitude) }} 
+            />
+          )}
+
+          {/* Pulse Target on Recommendation Node */}
+          {recommendedZone && (
+             <AdvancedMarker 
+                position={{ lat: Number(recommendedZone.latitude), lng: Number(recommendedZone.longitude) }} 
+                zIndex={200}
+             >
+                <div className="w-12 h-12 border-4 border-emerald-400 bg-emerald-500/30 rounded-full animate-ping pointer-events-none" />
+             </AdvancedMarker>
+          )}
+
         </Map>
       </APIProvider>
 

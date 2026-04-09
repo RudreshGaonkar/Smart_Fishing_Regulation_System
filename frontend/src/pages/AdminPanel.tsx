@@ -4,8 +4,9 @@ import { Settings, Edit2, CheckCircle, ShieldAlert, Plus, X, Loader2 } from 'luc
 import {
   fetchZones, fetchAlerts, fetchSpecies, fetchPorts,
   createZone, createSpecies, resolveAlert, updateCatchLimit,
+  createPort, updatePort, deletePort
 } from '../services/dataService';
-import type { CreateZonePayload, CreateSpeciesPayload, UpdateCatchLimitPayload, Port } from '../services/dataService';
+import type { CreateZonePayload, CreateSpeciesPayload, UpdateCatchLimitPayload, Port, CreatePortPayload } from '../services/dataService';
 import { ZoneCreationMap } from '../components/ZoneCreationMap';
 import type { FishingZone } from '../types/zone.types';
 import type { FishSpecies } from '../types/fish.types';
@@ -41,11 +42,13 @@ export const AdminPanel: React.FC = () => {
   const [showZoneModal, setShowZoneModal] = useState(false);
   const [showSpeciesModal, setShowSpeciesModal] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showPortModal, setShowPortModal] = useState(false);
 
   // Form states
   const [zoneForm, setZoneForm] = useState<Partial<CreateZonePayload>>({ zone_type: 'open', water_type: 'ocean' });
   const [speciesForm, setSpeciesForm] = useState<Partial<CreateSpeciesPayload>>({ risk_level: 0, is_protected: false });
   const [limitForm, setLimitForm] = useState<Partial<UpdateCatchLimitPayload>>({ user_role: 'all', max_per_day: 10, effective_from: new Date().toISOString().split('T')[0] });
+  const [portForm, setPortForm] = useState<Partial<CreatePortPayload>>({ latitude: 15.49, longitude: 73.82 });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -158,6 +161,28 @@ export const AdminPanel: React.FC = () => {
     } finally { setFormLoading(false); }
   };
 
+  const handleCreatePort = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormLoading(true); setFormError(null);
+    try {
+      const created = await createPort(portForm as CreatePortPayload);
+      setPorts((prev) => [...prev, created]);
+      setShowPortModal(false);
+      setPortForm({ latitude: 15.49, longitude: 73.82 });
+    } catch (err: any) {
+      setFormError(err.response?.data?.error || 'Failed to create port');
+    } finally { setFormLoading(false); }
+  };
+
+  const handleDeletePort = async (portId: number) => {
+    try {
+      await deletePort(portId);
+      setPorts((prev) => prev.filter((p) => p.port_id !== portId));
+    } catch (err: any) {
+      alert("Failed to delete port: " + err.message);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8 pb-12">
       {/* Header */}
@@ -188,6 +213,10 @@ export const AdminPanel: React.FC = () => {
           <button onClick={() => { setShowSpeciesModal(true); setFormError(null); }}
             className="clay-button px-5 py-3 rounded-xl bg-teal-500 text-white border-teal-400 font-bold flex items-center gap-2 hover:bg-teal-600">
             <Plus size={18} /> Add Species
+          </button>
+          <button onClick={() => { setShowPortModal(true); setFormError(null); }}
+            className="clay-button px-5 py-3 rounded-xl bg-emerald-500 text-white border-emerald-400 font-bold flex items-center gap-2 hover:bg-emerald-600">
+            <Plus size={18} /> Add Port
           </button>
           <button onClick={() => { setShowLimitModal(true); setFormError(null); }}
             className="clay-button px-5 py-3 rounded-xl bg-amber-500 text-white border-amber-400 font-bold flex items-center gap-2 hover:bg-amber-600">
@@ -258,6 +287,29 @@ export const AdminPanel: React.FC = () => {
                 </div>
               ))}
               {zones.length === 0 && <p className="text-slate-400 italic text-center py-8">No zones found</p>}
+            </div>
+          </div>
+
+          {/* Ports List */}
+          <div className="clay-card p-8 flex flex-col h-full col-span-full lg:col-span-1">
+            <h3 className="text-xl font-extrabold text-ocean-900 mb-6 px-1">
+              Registered Ports <span className="text-ocean-400 font-bold text-base ml-2">({ports.length})</span>
+            </h3>
+            <div className="flex flex-col gap-4 flex-1 overflow-y-auto max-h-[400px] pr-1">
+              {ports.map((port) => (
+                <div key={port.port_id} className="clay-inset p-4 rounded-2xl flex justify-between items-center group">
+                  <div>
+                    <h4 className="font-extrabold text-ocean-900 leading-tight">{port.name}</h4>
+                    <p className="text-xs font-semibold text-ocean-700/70 mt-1">
+                      {Number(port.latitude).toFixed(4)}, {Number(port.longitude).toFixed(4)}
+                    </p>
+                  </div>
+                  <button onClick={() => handleDeletePort(port.port_id)} className="text-red-500 hover:text-red-600 bg-red-100/50 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+              {ports.length === 0 && <p className="text-slate-400 italic text-center py-8">No ports found</p>}
             </div>
           </div>
 
@@ -485,6 +537,58 @@ export const AdminPanel: React.FC = () => {
               {formLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Apply Limit
             </button>
           </form>
+        </ModalWrap>
+      )}
+
+      {showPortModal && (
+        <ModalWrap title="Add Departure Port" onClose={() => setShowPortModal(false)}>
+          <div className="max-h-[85vh] overflow-y-auto pr-2 -mr-2">
+            <form onSubmit={handleCreatePort} className="flex flex-col gap-4 pb-4">
+              {formError && <p className="text-red-500 text-sm font-semibold">{formError}</p>}
+              
+              <ZoneCreationMap 
+                onLocationSelect={(lat, lng, address) => {
+                  setPortForm(p => ({
+                    ...p,
+                    latitude: Number(lat.toFixed(6)),
+                    longitude: Number(lng.toFixed(6)),
+                    name: (p.name && p.name.length > 0) ? p.name : address || ''
+                  }));
+                }} 
+                lat={portForm.latitude} 
+                lng={portForm.longitude} 
+                existingZones={[]} 
+              />
+
+              <div className="flex flex-col gap-1 mt-2">
+                <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">Port Name</label>
+                <div className="clay-inset rounded-xl">
+                  <input required type="text" placeholder="e.g. Panaji Harbor" className={inputCls} value={portForm.name || ''}
+                    onChange={(e) => setPortForm((p) => ({ ...p, name: e.target.value }))} />
+                </div>
+              </div>
+              
+              <div className="flex gap-4">
+                {[
+                  { label: 'Latitude', key: 'latitude', type: 'number', placeholder: '15.49' },
+                  { label: 'Longitude', key: 'longitude', type: 'number', placeholder: '73.82' },
+                ].map(({ label, key, type, placeholder }) => (
+                  <div key={key} className="flex flex-col gap-1 flex-1">
+                    <label className="text-xs font-bold text-ocean-800 uppercase tracking-wide ml-1">{label}</label>
+                    <div className="clay-inset rounded-xl">
+                      <input required type={type} step="any" placeholder={placeholder} className={inputCls} value={(portForm as any)[key] || ''}
+                        onChange={(e) => setPortForm((p) => ({ ...p, [key]: parseFloat(e.target.value) }))} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button type="submit" disabled={formLoading}
+                className="clay-button h-12 mt-2 bg-emerald-500 text-white border-emerald-400 font-bold hover:bg-emerald-600 flex items-center justify-center gap-2 disabled:opacity-60">
+                {formLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Register Port
+              </button>
+            </form>
+          </div>
         </ModalWrap>
       )}
     </div>

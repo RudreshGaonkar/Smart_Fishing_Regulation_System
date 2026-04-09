@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useFishingSessionContext } from '../context/FishingSessionContext';
 import { CatchForm } from '../components/CatchForm';
 import MapView from '../components/MapView';
-import { fetchZones } from '../services/dataService';
+import { fetchZones, fetchPorts, Port } from '../services/dataService';
 import type { FishingZone } from '../types/zone.types';
 import { Activity, CheckCircle2, AlertTriangle, Anchor, XCircle, Loader2 } from 'lucide-react';
 
@@ -17,12 +17,17 @@ export const FishingSimulation: React.FC = () => {
   } = useFishingSessionContext();
 
   const [zones, setZones] = useState<FishingZone[]>([]);
+  const [ports, setPorts] = useState<Port[]>([]);
   const [selectedZoneId, setSelectedZoneId] = useState<number | undefined>(undefined);
+  const [recommendedZoneId, setRecommendedZoneId] = useState<number | undefined>(undefined);
   const [isLoadingZones, setIsLoadingZones] = useState(true);
 
   useEffect(() => {
-    fetchZones()
-      .then((data) => setZones(data))
+    Promise.all([fetchZones(), fetchPorts()])
+      .then(([zonesData, portsData]) => {
+        setZones(zonesData);
+        setPorts(portsData);
+      })
       .catch(console.error)
       .finally(() => setIsLoadingZones(false));
   }, []);
@@ -56,8 +61,12 @@ export const FishingSimulation: React.FC = () => {
           {!isSessionActive ? (
             <CatchForm
               zones={zones}
+              ports={ports}
               onSubmit={handleStartSimulation}
-              onZoneSelect={setSelectedZoneId}
+              onZoneSelect={(zoneId, recZoneId) => {
+                 setSelectedZoneId(zoneId);
+                 setRecommendedZoneId(recZoneId);
+              }}
               isLoading={isStarting || isLoadingZones}
             />
           ) : (
@@ -124,6 +133,7 @@ export const FishingSimulation: React.FC = () => {
                   <MapView
                     zones={zones}
                     highlightedZoneId={isSessionActive ? (activeSession?.zone_id ?? selectedZoneId) : selectedZoneId}
+                    recommendedZoneId={!isSessionActive ? recommendedZoneId : undefined}
                   />
                )}
             </div>

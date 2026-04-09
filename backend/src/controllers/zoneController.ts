@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { pool } from '../config/db';
 import { RowDataPacket } from 'mysql2';
 import { ZoneGraph } from '../dsa/graph';
+import { ZoneSuggestionService } from '../services/zoneSuggestionService';
 import { AuthRequest } from '../middleware/authMiddleware';
 
 export const getAllZones = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -57,5 +58,42 @@ export const getSafeAlternatives = async (req: AuthRequest, res: Response): Prom
   } catch (error: any) {
     console.error('getSafeAlternatives error:', error.message);
     res.status(500).json({ error: 'Internal server error while finding safe alternatives' });
+  }
+};
+
+export const getRecommendation = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const zoneId = parseInt(req.params.id as string, 10);
+    if (isNaN(zoneId)) {
+      res.status(400).json({ error: 'Invalid zone ID' });
+      return;
+    }
+
+    // Use our BFS implementation wrapped intelligently in the service layer
+    const { recommendedZoneId, distance } = await ZoneSuggestionService.suggestAlternativeZone(zoneId);
+
+    // Grab the actual reason why they are locked out (the unresolved alert driving the exclusion)
+    const [alerts] = await pool.query<RowDataPacket[]>(
+      `SELECT message FROM risk_alerts WHERE zone_id = ? AND is_resolved = FALSE ORDER BY created_at DESC LIMIT 1`,
+      [zoneId]
+    );
+    const alertMessage = alerts.length > 0 ? alerts[0].message : 'Geographic area currently flagged for ecological recovery protocols.';
+
+    if (recommendedZoneId === null) {
+      res.status(404).json({ message: alertMessage, recommendation: null });
+      return;
+    }
+
+    const [zoneDetails] = await pool.query<RowDataPacket[]>('SELECT * FROM fishing_zones WHERE zone_id = ?', [recommendedZoneId]);
+
+    res.status(200).json({
+      message: alertMessage,
+      recommendation: zoneDetails[0],
+      distance_km: distance
+    });
+
+  } catch (error: any) {
+    console.error('getRecommendation error:', error.message);
+    res.status(500).json({ error: 'Internal server error while resolving Zone Graph Path' });
   }
 };
