@@ -1,9 +1,10 @@
 import React from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
+import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 
 export interface FishingZone {
   zone_id: number;
   zone_name: string;
+  zone_code?: string;
   latitude: number | string;
   longitude: number | string;
   zone_type: 'open' | 'restricted' | 'protected' | 'closed';
@@ -11,67 +12,78 @@ export interface FishingZone {
 
 interface MapViewProps {
   zones: FishingZone[];
-  suggestedZoneId?: number;
+  highlightedZoneId?: number;
 }
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
-const MapView: React.FC<MapViewProps> = ({ zones, suggestedZoneId }) => {
-  const getZoneColor = (type: string) => {
+const MapView: React.FC<MapViewProps> = ({ zones, highlightedZoneId }) => {
+  const getZoneStyles = (type: string, isHighlighted: boolean) => {
+    if (isHighlighted) {
+      return { 
+        border: 'border-cyan-400', 
+        bg: 'bg-cyan-500/80', 
+        shadow: 'shadow-[0_0_25px_rgba(34,211,238,0.9)]' 
+      };
+    }
+    
     switch (type) {
       case 'open':
-        return '#22c55e'; // Green
+        return { border: 'border-green-400', bg: 'bg-green-500/30', shadow: '' };
       case 'restricted':
       case 'protected':
-        return '#eab308'; // Yellow
+        return { border: 'border-yellow-400', bg: 'bg-yellow-500/30', shadow: '' };
       case 'closed':
-        return '#ef4444'; // Red
+        return { border: 'border-red-400', bg: 'bg-red-500/30', shadow: '' };
       default:
-        return '#aaaaaa'; // Gray fallback
+        return { border: 'border-gray-400', bg: 'bg-gray-500/30', shadow: '' };
     }
   };
 
   return (
-    <div className="w-full h-[500px] rounded-xl overflow-hidden shadow-lg border border-white/20">
+    <div className="w-full h-full min-h-[500px] rounded-[1.25rem] overflow-hidden shadow-lg border border-ocean-100 relative">
+      {!GOOGLE_MAPS_API_KEY && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-100 p-4 text-center">
+          <p className="text-red-500 font-bold">Google Maps API Key completely missing from .env</p>
+        </div>
+      )}
       <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
         <Map
-          defaultCenter={{ lat: 15.4909, lng: 73.8278 }} // Coast of India
-          defaultZoom={11}
-          mapId="DEMO_MAP_ID" // Required for AdvancedMarker
+          defaultCenter={{ lat: 15.4909, lng: 73.8278 }}
+          defaultZoom={10}
+          mapId="DEMO_MAP_ID"
           gestureHandling="greedy"
           disableDefaultUI={true}
         >
           {zones.map((zone) => {
-            const isSuggested = zone.zone_id === suggestedZoneId;
+            const isHighlighted = zone.zone_id === highlightedZoneId;
             const lat = Number(zone.latitude);
             const lng = Number(zone.longitude);
 
             if (isNaN(lat) || isNaN(lng)) return null;
+
+            const styles = getZoneStyles(zone.zone_type, isHighlighted);
 
             return (
               <AdvancedMarker
                 key={zone.zone_id}
                 position={{ lat, lng }}
                 title={zone.zone_name}
-                zIndex={isSuggested ? 100 : 1}
+                zIndex={isHighlighted ? 100 : 1}
               >
-                <div className="relative flex items-center justify-center">
-                  {/* Glowing effect for suggested zone */}
-                  {isSuggested && (
-                    <div className="absolute w-12 h-12 bg-blue-500 rounded-full animate-ping opacity-75"></div>
-                  )}
-                  
-                  {/* Pin customization */}
-                  <Pin
-                    background={isSuggested ? '#3b82f6' : getZoneColor(zone.zone_type)}
-                    borderColor={isSuggested ? '#1d4ed8' : '#ffffff'}
-                    glyphColor={isSuggested ? '#bfdbfe' : '#ffffff'}
-                    scale={isSuggested ? 1.4 : 1.1}
-                  />
-                  
-                  {/* Tooltip on hover */}
-                  <div className="absolute top-10 w-max bg-white/90 backdrop-blur-sm px-3 py-1 rounded-md text-sm font-semibold text-gray-800 shadow-md opacity-0 hover:opacity-100 transition-opacity">
-                    {zone.zone_name} {isSuggested && '⭐ (Safest)'}
+                {/* Visual Grid Cell utilizing AdvancedMarker DOM projection */}
+                <div 
+                  className={`relative flex items-center justify-center w-28 h-28 sm:w-36 sm:h-36 transition-all duration-300 backdrop-blur-[2px] border-2 rounded-md ${styles.border} ${styles.bg} ${styles.shadow} ${isHighlighted ? 'scale-110 z-50 animate-pulse' : 'scale-100'}`}
+                >
+                  <div className="text-center pointer-events-none">
+                    <p className={`font-extrabold text-[10px] sm:text-xs uppercase tracking-wider drop-shadow-md ${isHighlighted ? 'text-white' : 'text-slate-800'}`}>
+                      {zone.zone_code || zone.zone_name}
+                    </p>
+                    {isHighlighted && (
+                      <span className="bg-white text-cyan-800 text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 inline-block shadow-sm">
+                        Selected Target
+                      </span>
+                    )}
                   </div>
                 </div>
               </AdvancedMarker>

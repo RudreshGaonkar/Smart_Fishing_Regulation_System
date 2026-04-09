@@ -1,13 +1,16 @@
 import { useState, useCallback } from 'react';
-
-type EffortLevel = 'low' | 'medium' | 'high';
+import { startSession as apiStartSession, logCatch as apiLogCatch } from '../services/dataService';
+import type { StartSessionPayload, LogCatchPayload } from '../services/dataService';
 
 interface FishingSessionState {
   sessionId: number | null;
   zoneId: number | null;
-  effortLevel: EffortLevel;
-  status: 'inactive' | 'active' | 'completed' | 'cancelled';
-  expectedCatchCalculating: boolean;
+  effortLevel: 'low' | 'medium' | 'high';
+  departurePort: string | null;
+  status: 'inactive' | 'active' | 'completed';
+  isLoading: boolean;
+  error: string | null;
+  lastCatchResult: { is_within_limit: boolean; message: string } | null;
 }
 
 export const useFishingSession = () => {
@@ -15,50 +18,59 @@ export const useFishingSession = () => {
     sessionId: null,
     zoneId: null,
     effortLevel: 'medium',
+    departurePort: null,
     status: 'inactive',
-    expectedCatchCalculating: false,
+    isLoading: false,
+    error: null,
+    lastCatchResult: null,
   });
 
-  const startSession = useCallback(async (zoneId: number, effortLevel: EffortLevel = 'medium') => {
-    // Attempting to simulate an API call
-    setSession((prev) => ({ ...prev, status: 'inactive', expectedCatchCalculating: true }));
-    
+  const startSession = useCallback(async (payload: StartSessionPayload) => {
+    setSession((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
-      // Mock API delay
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      
-      setSession({
-        sessionId: Math.floor(Math.random() * 1000) + 1,
-        zoneId,
-        effortLevel,
+      const result = await apiStartSession(payload);
+      setSession((prev) => ({
+        ...prev,
+        sessionId: result.session_id,
+        zoneId: result.zone_id,
+        effortLevel: payload.effort_level,
+        departurePort: payload.departure_port ?? null,
         status: 'active',
-        expectedCatchCalculating: false,
-      });
-    } catch (error) {
-      setSession((prev) => ({ ...prev, expectedCatchCalculating: false }));
-      console.error("Failed to start session", error);
+        isLoading: false,
+      }));
+    } catch (err: any) {
+      setSession((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: err.response?.data?.error || 'Failed to start session',
+      }));
     }
   }, []);
 
-  const endSession = useCallback(async () => {
+  const logCatch = useCallback(async (payload: LogCatchPayload) => {
+    if (!session.sessionId) return;
+    setSession((prev) => ({ ...prev, isLoading: true, error: null, lastCatchResult: null }));
     try {
-      // Mock API delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setSession((prev) => ({ ...prev, status: 'completed' }));
-    } catch (error) {
-      console.error("Failed to end session", error);
+      const result = await apiLogCatch(session.sessionId, payload);
+      setSession((prev) => ({ ...prev, isLoading: false, lastCatchResult: result }));
+    } catch (err: any) {
+      setSession((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: err.response?.data?.error || 'Failed to log catch',
+      }));
     }
-  }, []);
+  }, [session.sessionId]);
 
-  const updateEffortLevel = useCallback((level: EffortLevel) => {
-    setSession((prev) => ({ ...prev, effortLevel: level }));
+  const endSession = useCallback(() => {
+    setSession((prev) => ({ ...prev, status: 'completed', sessionId: null }));
   }, []);
 
   return {
     session,
     startSession,
+    logCatch,
     endSession,
-    updateEffortLevel,
-    isActive: session.status === 'active'
+    isActive: session.status === 'active',
   };
 };
