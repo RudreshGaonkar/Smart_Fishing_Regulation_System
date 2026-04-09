@@ -1,52 +1,86 @@
 import React from 'react';
-import { MapPin, Plus, Minus } from 'lucide-react';
+import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 
-interface MapViewProps {
-  isLoading?: boolean;
-  selectedZoneId?: number | null;
+export interface FishingZone {
+  zone_id: number;
+  zone_name: string;
+  latitude: number | string;
+  longitude: number | string;
+  zone_type: 'open' | 'restricted' | 'protected' | 'closed';
 }
 
-export const MapView: React.FC<MapViewProps> = ({ isLoading = false, selectedZoneId = null }) => {
+interface MapViewProps {
+  zones: FishingZone[];
+  suggestedZoneId?: number;
+}
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+const MapView: React.FC<MapViewProps> = ({ zones, suggestedZoneId }) => {
+  const getZoneColor = (type: string) => {
+    switch (type) {
+      case 'open':
+        return '#22c55e'; // Green
+      case 'restricted':
+      case 'protected':
+        return '#eab308'; // Yellow
+      case 'closed':
+        return '#ef4444'; // Red
+      default:
+        return '#aaaaaa'; // Gray fallback
+    }
+  };
+
   return (
-    <div className="w-full h-full min-h-[450px] clay-card p-3 flex flex-col relative overflow-hidden">
-      {/* Soft overlay simulating the map area */}
-      <div className="clay-inset w-full h-full rounded-[1.25rem] flex flex-col items-center justify-center bg-ocean-100/50 relative overflow-hidden">
-        
-        {/* Placeholder Custom 'Map' Graphic */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{
-           backgroundImage: 'radial-gradient(circle at 20% 30%, #0284c7 1px, transparent 1px), radial-gradient(circle at 80% 60%, #0284c7 1px, transparent 1px)',
-           backgroundSize: '40px 40px'
-        }}></div>
+    <div className="w-full h-[500px] rounded-xl overflow-hidden shadow-lg border border-white/20">
+      <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+        <Map
+          defaultCenter={{ lat: 15.4909, lng: 73.8278 }} // Coast of India
+          defaultZoom={11}
+          mapId="DEMO_MAP_ID" // Required for AdvancedMarker
+          gestureHandling="greedy"
+          disableDefaultUI={true}
+        >
+          {zones.map((zone) => {
+            const isSuggested = zone.zone_id === suggestedZoneId;
+            const lat = Number(zone.latitude);
+            const lng = Number(zone.longitude);
 
-        {/* Central Content */}
-        <div className="flex flex-col items-center gap-4 text-ocean-600 z-10">
-          <div className={`p-4 rounded-full ${isLoading ? 'animate-pulse bg-ocean-200/50' : 'bg-ocean-200/80 shadow-[inset_2px_2px_5px_rgba(255,255,255,0.7),inset_-2px_-2px_5px_rgba(0,0,0,0.05)]'}`}>
-             <MapPin size={40} className={isLoading ? 'opacity-80 animate-bounce' : 'opacity-100 text-ocean-700'} />
-          </div>
-          
-          <h3 className="text-xl font-bold tracking-tight text-ocean-800">
-            {isLoading 
-              ? 'Loading Map Data...' 
-              : selectedZoneId 
-                ? `Zone ID: ${selectedZoneId} Selected` 
-                : 'Select a Zone on the Map'}
-          </h3>
-          
-          <p className="text-sm text-ocean-700/70 max-w-xs text-center leading-relaxed">
-            Placeholder container for the Google Maps API. The Graph / Map integration will render within this soft claymorphism bounds.
-          </p>
-        </div>
+            if (isNaN(lat) || isNaN(lng)) return null;
 
-        {/* Decorative elements representing map controls */}
-        <div className="absolute bottom-6 right-6 flex flex-col gap-3">
-          <button className="clay-button w-12 h-12 rounded-2xl flex items-center justify-center p-0" aria-label="Zoom In">
-            <Plus size={20} className="text-ocean-700 flex-shrink-0" />
-          </button>
-          <button className="clay-button w-12 h-12 rounded-2xl flex items-center justify-center p-0" aria-label="Zoom Out">
-            <Minus size={20} className="text-ocean-700 flex-shrink-0" />
-          </button>
-        </div>
-      </div>
+            return (
+              <AdvancedMarker
+                key={zone.zone_id}
+                position={{ lat, lng }}
+                title={zone.zone_name}
+                zIndex={isSuggested ? 100 : 1}
+              >
+                <div className="relative flex items-center justify-center">
+                  {/* Glowing effect for suggested zone */}
+                  {isSuggested && (
+                    <div className="absolute w-12 h-12 bg-blue-500 rounded-full animate-ping opacity-75"></div>
+                  )}
+                  
+                  {/* Pin customization */}
+                  <Pin
+                    background={isSuggested ? '#3b82f6' : getZoneColor(zone.zone_type)}
+                    borderColor={isSuggested ? '#1d4ed8' : '#ffffff'}
+                    glyphColor={isSuggested ? '#bfdbfe' : '#ffffff'}
+                    scale={isSuggested ? 1.4 : 1.1}
+                  />
+                  
+                  {/* Tooltip on hover */}
+                  <div className="absolute top-10 w-max bg-white/90 backdrop-blur-sm px-3 py-1 rounded-md text-sm font-semibold text-gray-800 shadow-md opacity-0 hover:opacity-100 transition-opacity">
+                    {zone.zone_name} {isSuggested && '⭐ (Safest)'}
+                  </div>
+                </div>
+              </AdvancedMarker>
+            );
+          })}
+        </Map>
+      </APIProvider>
     </div>
   );
 };
+
+export default MapView;

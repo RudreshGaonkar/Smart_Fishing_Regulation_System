@@ -116,6 +116,7 @@ CREATE TABLE fishing_sessions (
   session_id    INT             UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id       INT UNSIGNED    NOT NULL,
   zone_id       INT UNSIGNED    NOT NULL,
+  departure_port VARCHAR(150),
   effort_level  ENUM('low','medium','high') NOT NULL DEFAULT 'medium',
   started_at    TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
   ended_at      TIMESTAMP,

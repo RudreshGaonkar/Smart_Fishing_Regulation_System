@@ -3,9 +3,9 @@ import { pool } from '../config/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const ADMIN_EMAIL = 'admin@smartfishing.gov';
-const ADMIN_USERNAME = 'master_admin';
-const ADMIN_FULL_NAME = 'Master Administrator';
-const ADMIN_DEFAULT_PASSWORD = 'SmartFish@Admin2024!';
+const ADMIN_USERNAME = 'admin';
+const ADMIN_FULL_NAME = 'admin';
+const ADMIN_DEFAULT_PASSWORD = 'admin123';
 
 async function seedAdmin(): Promise<void> {
   console.log('🌱 Starting Admin Seeder...');
@@ -33,14 +33,14 @@ async function seedAdmin(): Promise<void> {
       [ADMIN_USERNAME, ADMIN_EMAIL, password_hash, ADMIN_FULL_NAME]
     );
 
-    console.log(`✅  Master Admin created successfully!`);
+    console.log(`Master Admin created successfully!`);
     console.log(`   User ID : ${result.insertId}`);
     console.log(`   Email   : ${ADMIN_EMAIL}`);
     console.log(`   Password: ${ADMIN_DEFAULT_PASSWORD}`);
-    console.log(`\n⚠️  IMPORTANT: Change this password immediately after first login.`);
+    console.log(`\n IMPORTANT: Change this password immediately after first login.`);
 
   } catch (err: any) {
-    console.error('❌ Seeder failed:', err.message);
+    console.error(' Seeder failed:', err.message);
     process.exit(1);
   } finally {
     await pool.end();

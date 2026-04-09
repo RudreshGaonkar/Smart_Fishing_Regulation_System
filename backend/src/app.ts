@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes';
+import sessionRoutes from './routes/session.routes';
+import zoneRoutes from './routes/zone.routes';
 
 const app = express();
 
@@ -12,5 +14,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/sessions', sessionRoutes);
+app.use('/api/zones', zoneRoutes);
 
 export { app };
